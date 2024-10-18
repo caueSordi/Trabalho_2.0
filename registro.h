@@ -84,3 +84,11 @@
     void registro_setEncadeamento(Registro *registro, int encadeamento);
 
 #endif
+
+
+
+
+
+
+
+
