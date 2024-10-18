@@ -1,5 +1,5 @@
 #include "cabecalho.h"
-
+#include "registro.h"
 /*
 #define CABECALHO_STATUS_OK 1
 #define CABECALHO_STATUS_INCON 0
@@ -125,98 +125,85 @@ void cabecalho_setNroPagDisco(Cabecalho *cabecalho, int nropag){
 void cabecalho_setQttCompacta(Cabecalho *cabecalho, int quant){
     cabecalho->qttCompacta = quant;
 }
-
-void INSERE(char *nomearqbin, int qnt){
-    // Abre o arquivo lendo o cabeçalho
+void INSERE(char *nomearqbin, int qnt) {
+    // Abre o arquivo binário em modo leitura e escrita ("rb+")
     FILE* arq = fopen(nomearqbin, "rb+");
 
-    // Se deu erro
+    // Verifica se o arquivo foi aberto corretamente
     if (arq == NULL) {
-        // Sai pois o erro foi avisado em AbrirArquivo
+        perror("Erro ao abrir o arquivo binário");
         return;
     }
 
-    // Lê o cabeçalho do arquivo
+    // Lê o cabeçalho do arquivo para obter metadados (como RRN e registros removidos)
     Cabecalho* cab = cabecalho_readbin(arq);
 
-    // String auxiliar
+    // Aloca memória para uma string auxiliar usada para entrada de dados
     char* aux = calloc(200, sizeof(char));
-    // Registro para armazenar os dados
+    if (aux == NULL) {
+        perror("Erro ao alocar memória para string auxiliar");
+        fclose(arq);
+        return;
+    }
+
+    // Cria um registro vazio para ser preenchido e inserido
     Registro *reg = cria_registro();
 
-    // Para cada registro a ser inserido
+    // Loop para inserir `qnt` registros no arquivo
     for (int i = 0; i < qnt; i++) {
-        // Para cada atributo do registro
+        // Loop para ler e atribuir os 10 atributos do registro atual
         for (int j = 0; j < 10; j++) {
-            // Lê o valor do atributo
+            // Lê o valor do atributo usando `scan_quote_string` (provavelmente trata aspas)
             scan_quote_string(aux);
-            // Se foi digitado NULO
-            if (strcmp(aux, "") == 0)
-                // Avança para o próximo atributo
-                continue;
 
-            // Para escolher qual atributo definir
+            // Se o valor lido é uma string vazia, o campo é considerado NULO e é ignorado
+            if (strcmp(aux, "") == 0) continue;
+
+            // Atribui o valor lido ao campo correspondente, com base em `j`
             switch (j) {
-                case 0:
-                    registro_setNome(reg, strdup(aux));
-                    break;
-                case 1:
-                    registro_setDieta(reg, strdup(aux));
-                    break;
-                case 2:
-                    registro_setHabitat(reg, strdup(aux));
-                    break;
-                case 3:
-                    registro_setPop(reg, atoi(aux));
-                    break;
-                case 4:
-                    registro_setTipo(reg, strdup(aux));
-                    break;
-                case 5:
-                    registro_setVelocidade(reg, atoi(aux));
-                    break;
-                case 6:
-                    registro_setUnimedida(reg, aux[0]);
-                    break;
-                case 7:
-                    registro_setTam(reg, atof(aux));
-                    break;
-                case 8:
-                    registro_setNEspecie(reg, strdup(aux));
-                    break;
-                case 9:
-                    registro_setAlimenta(reg, strdup(aux));
-                    break;
+                case 0: registro_setNome(reg, strdup(aux)); break;
+                case 1: registro_setDieta(reg, strdup(aux)); break;
+                case 2: registro_setHabitat(reg, strdup(aux)); break;
+                case 3: registro_setPop(reg, atoi(aux)); break;  // Converte para int
+                case 4: registro_setTipo(reg, strdup(aux)); break;
+                case 5: registro_setVelocidade(reg, atoi(aux)); break;  // Converte para int
+                case 6: registro_setUnimedida(reg, aux[0]); break;  // Usa o primeiro caractere
+                case 7: registro_setTam(reg, atof(aux)); break;  // Converte para float
+                case 8: registro_setNEspecie(reg, strdup(aux)); break;
+                case 9: registro_setAlimenta(reg, strdup(aux)); break;
             }
         }
 
-        // Se um registro já foi removido logicamente
+        // Verifica se há registros removidos logicamente para reaproveitar espaço
         if (cab->nroRegRem > 0) {
-            // Pega o começo do atributo de encadeamento do último registro removido logicamente
+            // Posiciona o ponteiro no registro removido mais recente (topo da lista de removidos)
             fseek(arq, 1600 + 160 * cab->topo + 1, SEEK_SET);
-            // Pega o RRN do registro removido logicamente anterior
+
+            // Lê o próximo RRN disponível no encadeamento da lista de removidos
             fread(&cab->topo, sizeof(int), 1, arq);
-            // Vai para o começo do registro
+
+            // Retorna para o início do registro removido para sobrescrevê-lo
             fseek(arq, -5, SEEK_CUR);
-            // Define que há um registro removido logicamente a menos
+
+            // Atualiza o contador de registros removidos
             cab->nroRegRem--;
         } else {
-            // Pega o começo do registro a ser inserido no fim
+            // Posiciona o ponteiro no próximo registro disponível no fim do arquivo
             fseek(arq, 1600 + 160 * cab->proxRRN, SEEK_SET);
 
-            // Se começará uma nova página
-            if (cab->proxRRN % 10 == 0)
-                // Define que há uma nova página
-                cab->nroPagDisco++;
+            // Se o próximo registro cria uma nova página (multiplo de 10)
+            if (cab->proxRRN % 10 == 0) {
+                cab->nroPagDisco++;  // Incrementa o número de páginas usadas
+            }
 
-            // Define que o último registro tem um RRN maior
+            // Incrementa o próximo RRN disponível
             cab->proxRRN++;
         }
 
-        // Salva o novo registro no local definido
+        // Escreve o registro preenchido no arquivo binário
         registro_writebin(arq, reg);
 
-        // Libera o espaço alocado e cria um novo registro nulo
+        // Libera a memória dos campos de string do registro após a gravação
         free(registro_getNome(reg));
         free(registro_getDieta(reg));
         free(registro_getHabitat(reg));
@@ -225,14 +212,16 @@ void INSERE(char *nomearqbin, int qnt){
         free(registro_getAlimenta(reg));
     }
 
-    // Libera os espaços alocados
+    // Libera a memória da string auxiliar e do registro
     free(aux);
     free(reg);
 
-    // Fecha o arquivo, atualizando o cabeçalho
+    // Atualiza o cabeçalho do arquivo com as mudanças realizadas
     cabecalho_writebin(arq, cab);
+
+    // Fecha o arquivo binário
     fclose(arq);
 
-    // Função de verificação do projeto
+    // Função de verificação do projeto (exibe o conteúdo do arquivo na tela)
     binarioNaTela(nomearqbin);
 }

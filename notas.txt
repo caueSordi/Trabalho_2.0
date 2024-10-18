@@ -1,0 +1,21 @@
+aqui eu vou colocar tudo q deve estar em obsevação pois acho 
+mais pratico para acompanhar
+
+* 3 funçoes inexistentes
+* não sei preciso copiar todos os arquivos ou apenas os codigos com funcoes e o main
+*vou colocar uma pasta com os arquivos binarios e CSVs e tals
+* força e foco que vamos vencer : )
+
+
+
+ //Funcao de Remover
+    case 4:
+        //nosso arquivo a ser modificado
+        scanf("%s", aux1);
+        //quantos iremos Remover
+        scanf(" %d ", &qtd);
+        //a querida funcao q vai fazer tudo
+        REMOVE_REGISTRO(aux1, qtd);
+        break;
+    //
+
