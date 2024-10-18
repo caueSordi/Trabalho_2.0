@@ -49,6 +49,15 @@ int main()
             break;
            
         }
+        case 5:{
+            //pega enderaco do arquivo
+            scanf("%s", nomearqbin);
+            int qnt = 0;
+            scanf("%d", &qnt);
+            //chama a função de inserção
+            INSERE(nomearqbin, qnt);
+            break;
+        }
          default:
                 return 0;
     }

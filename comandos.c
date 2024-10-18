@@ -125,3 +125,114 @@ void cabecalho_setNroPagDisco(Cabecalho *cabecalho, int nropag){
 void cabecalho_setQttCompacta(Cabecalho *cabecalho, int quant){
     cabecalho->qttCompacta = quant;
 }
+
+void INSERE(char *nomearqbin, int qnt){
+    // Abre o arquivo lendo o cabeçalho
+    FILE* arq = fopen(nomearqbin, "rb+");
+
+    // Se deu erro
+    if (arq == NULL) {
+        // Sai pois o erro foi avisado em AbrirArquivo
+        return;
+    }
+
+    // Lê o cabeçalho do arquivo
+    Cabecalho* cab = cabecalho_readbin(arq);
+
+    // String auxiliar
+    char* aux = calloc(200, sizeof(char));
+    // Registro para armazenar os dados
+    Registro *reg = cria_registro();
+
+    // Para cada registro a ser inserido
+    for (int i = 0; i < qnt; i++) {
+        // Para cada atributo do registro
+        for (int j = 0; j < 10; j++) {
+            // Lê o valor do atributo
+            scan_quote_string(aux);
+            // Se foi digitado NULO
+            if (strcmp(aux, "") == 0)
+                // Avança para o próximo atributo
+                continue;
+
+            // Para escolher qual atributo definir
+            switch (j) {
+                case 0:
+                    registro_setNome(reg, strdup(aux));
+                    break;
+                case 1:
+                    registro_setDieta(reg, strdup(aux));
+                    break;
+                case 2:
+                    registro_setHabitat(reg, strdup(aux));
+                    break;
+                case 3:
+                    registro_setPop(reg, atoi(aux));
+                    break;
+                case 4:
+                    registro_setTipo(reg, strdup(aux));
+                    break;
+                case 5:
+                    registro_setVelocidade(reg, atoi(aux));
+                    break;
+                case 6:
+                    registro_setUnimedida(reg, aux[0]);
+                    break;
+                case 7:
+                    registro_setTam(reg, atof(aux));
+                    break;
+                case 8:
+                    registro_setNEspecie(reg, strdup(aux));
+                    break;
+                case 9:
+                    registro_setAlimenta(reg, strdup(aux));
+                    break;
+            }
+        }
+
+        // Se um registro já foi removido logicamente
+        if (cab->nroRegRem > 0) {
+            // Pega o começo do atributo de encadeamento do último registro removido logicamente
+            fseek(arq, 1600 + 160 * cab->topo + 1, SEEK_SET);
+            // Pega o RRN do registro removido logicamente anterior
+            fread(&cab->topo, sizeof(int), 1, arq);
+            // Vai para o começo do registro
+            fseek(arq, -5, SEEK_CUR);
+            // Define que há um registro removido logicamente a menos
+            cab->nroRegRem--;
+        } else {
+            // Pega o começo do registro a ser inserido no fim
+            fseek(arq, 1600 + 160 * cab->proxRRN, SEEK_SET);
+
+            // Se começará uma nova página
+            if (cab->proxRRN % 10 == 0)
+                // Define que há uma nova página
+                cab->nroPagDisco++;
+
+            // Define que o último registro tem um RRN maior
+            cab->proxRRN++;
+        }
+
+        // Salva o novo registro no local definido
+        registro_writebin(arq, reg);
+
+        // Libera o espaço alocado e cria um novo registro nulo
+        free(registro_getNome(reg));
+        free(registro_getDieta(reg));
+        free(registro_getHabitat(reg));
+        free(registro_getTipo(reg));
+        free(registro_getNEspecie(reg));
+        free(registro_getAlimenta(reg));
+    }
+
+    // Libera os espaços alocados
+    free(aux);
+    free(reg);
+
+    // Fecha o arquivo, atualizando o cabeçalho
+    cabecalho_writebin(arq, cab);
+    fclose(arq);
+
+    // Função de verificação do projeto
+    binarioNaTela(nomearqbin);
+}
